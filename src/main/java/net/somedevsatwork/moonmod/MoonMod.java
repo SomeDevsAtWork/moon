@@ -28,6 +28,7 @@ import net.minecraftforge.fml.event.lifecycle.InterModProcessEvent;
 import net.minecraftforge.fml.event.server.FMLServerStartingEvent;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 import net.somedevsatwork.moonmod.blocks.MoonRockBlock;
+import net.somedevsatwork.moonmod.blocks.OxygenatorBlock;
 import net.somedevsatwork.moonmod.dimension.MoonBiome;
 import net.somedevsatwork.moonmod.dimension.MoonDimension;
 import net.somedevsatwork.moonmod.dimension.MoonModDimension;
@@ -52,6 +53,8 @@ public class MoonMod
     // Blocks
     public static MoonRockBlock moonRockBlock;
     public static BlockItem moonRockBlockItem;
+    public static OxygenatorBlock oxygenatorBlock;
+    public static BlockItem oxygenatorBlockItem;
 
     // Items
     public static SpaceHelmetItem spaceHelmetItem;
@@ -64,7 +67,7 @@ public class MoonMod
     public static MoonModDimension moonModDimension;
     public static MoonBiome moonBiome;
 
-    public static ItemGroup moonModItemGroup = new ItemGroup("Moon Mod") {
+    public static ItemGroup moonModItemGroup = new ItemGroup("moon") {
         @Override
         public ItemStack createIcon() {
             return new ItemStack(moonRockBlockItem);
@@ -127,7 +130,7 @@ public class MoonMod
 
         @SubscribeEvent
         public static void onDimensionRegister(RegisterDimensionsEvent event) {
-            moonDimensionType = DimensionManager.registerDimension(MoonModDimension.MOON_MOD_DIMENSION_RESOURCE_LOCATION, moonModDimension, null, true);
+            moonDimensionType = DimensionManager.registerOrGetDimension(MoonModDimension.MOON_MOD_DIMENSION_RESOURCE_LOCATION, moonModDimension, null, true);
         }
 
         @SubscribeEvent
@@ -156,20 +159,22 @@ public class MoonMod
         @SubscribeEvent
         public static void onBlocksRegistry(final RegistryEvent.Register<Block> event) {
             moonRockBlock = (MoonRockBlock)new MoonRockBlock().setRegistryName(MODID, "moon_rock");
+            oxygenatorBlock = (OxygenatorBlock)new OxygenatorBlock().setRegistryName(MODID, "oxygenator");
 
             // register a new block here
-            event.getRegistry().registerAll(moonRockBlock);
+            event.getRegistry().registerAll(moonRockBlock, oxygenatorBlock);
         }
 
         @SubscribeEvent
         public static void onItemsRegister(final RegistryEvent.Register<Item> event) {
             moonRockBlockItem = (BlockItem)new BlockItem(moonRockBlock, new Item.Properties().group(moonModItemGroup)).setRegistryName(MODID, "moon_rock_item");
+            oxygenatorBlockItem = (BlockItem)new BlockItem(oxygenatorBlock, new Item.Properties().group(moonModItemGroup)).setRegistryName(MODID, "oxygenator_item");
             spaceHelmetItem = (SpaceHelmetItem)new SpaceHelmetItem().setRegistryName(MODID, "space_helmet_item");
             spaceSuitItem = (SpaceSuitItem)new SpaceSuitItem().setRegistryName(MODID, "space_suit_item");
             spaceLeggingsItem = (SpaceLeggingsItem)new SpaceLeggingsItem().setRegistryName(MODID, "space_leggings_item");
             spaceBootsItem = (SpaceBootsItem) new SpaceBootsItem().setRegistryName(MODID, "space_boots_item");
 
-            event.getRegistry().registerAll(moonRockBlockItem, spaceHelmetItem, spaceSuitItem, spaceLeggingsItem, spaceBootsItem);
+            event.getRegistry().registerAll(moonRockBlockItem, oxygenatorBlockItem, spaceHelmetItem, spaceSuitItem, spaceLeggingsItem, spaceBootsItem);
         }
 
         @SubscribeEvent
