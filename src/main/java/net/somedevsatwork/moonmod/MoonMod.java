@@ -10,7 +10,10 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.world.biome.Biome;
 import net.minecraft.world.dimension.DimensionType;
 import net.minecraft.world.server.ServerWorld;
-import net.minecraftforge.common.*;
+import net.minecraftforge.common.BiomeManager;
+import net.minecraftforge.common.DimensionManager;
+import net.minecraftforge.common.MinecraftForge;
+import net.minecraftforge.common.ModDimension;
 import net.minecraftforge.event.CommandEvent;
 import net.minecraftforge.event.RegistryEvent;
 import net.minecraftforge.event.world.ChunkWatchEvent;
@@ -28,6 +31,10 @@ import net.somedevsatwork.moonmod.blocks.MoonRockBlock;
 import net.somedevsatwork.moonmod.dimension.MoonBiome;
 import net.somedevsatwork.moonmod.dimension.MoonDimension;
 import net.somedevsatwork.moonmod.dimension.MoonModDimension;
+import net.somedevsatwork.moonmod.items.SpaceBootsItem;
+import net.somedevsatwork.moonmod.items.SpaceHelmetItem;
+import net.somedevsatwork.moonmod.items.SpaceLeggingsItem;
+import net.somedevsatwork.moonmod.items.SpaceSuitItem;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -42,12 +49,19 @@ public class MoonMod
 
     public static final String MODID = "moon";
 
+    // Blocks
     public static MoonRockBlock moonRockBlock;
     public static BlockItem moonRockBlockItem;
 
+    // Items
+    public static SpaceHelmetItem spaceHelmetItem;
+    public static SpaceSuitItem spaceSuitItem;
+    public static SpaceLeggingsItem spaceLeggingsItem;
+    public static SpaceBootsItem spaceBootsItem;
+
+    // Dimension
     public static DimensionType moonDimensionType;
     public static MoonModDimension moonModDimension;
-
     public static MoonBiome moonBiome;
 
     public static ItemGroup moonModItemGroup = new ItemGroup("Moon Mod") {
@@ -150,8 +164,12 @@ public class MoonMod
         @SubscribeEvent
         public static void onItemsRegister(final RegistryEvent.Register<Item> event) {
             moonRockBlockItem = (BlockItem)new BlockItem(moonRockBlock, new Item.Properties().group(moonModItemGroup)).setRegistryName(MODID, "moon_rock_item");
+            spaceHelmetItem = (SpaceHelmetItem)new SpaceHelmetItem().setRegistryName(MODID, "space_helmet_item");
+            spaceSuitItem = (SpaceSuitItem)new SpaceSuitItem().setRegistryName(MODID, "space_suit_item");
+            spaceLeggingsItem = (SpaceLeggingsItem)new SpaceLeggingsItem().setRegistryName(MODID, "space_leggings_item");
+            spaceBootsItem = (SpaceBootsItem) new SpaceBootsItem().setRegistryName(MODID, "space_boots_item");
 
-            event.getRegistry().registerAll(moonRockBlockItem);
+            event.getRegistry().registerAll(moonRockBlockItem, spaceHelmetItem, spaceSuitItem, spaceLeggingsItem, spaceBootsItem);
         }
 
         @SubscribeEvent

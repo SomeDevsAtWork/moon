@@ -1,25 +1,13 @@
 package net.somedevsatwork.moonmod.dimension;
 
-import java.util.List;
-import net.minecraft.entity.EntityClassification;
-import net.minecraft.util.SharedSeedRandom;
 import net.minecraft.util.Util;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.ChunkPos;
 import net.minecraft.util.math.MathHelper;
-import net.minecraft.village.VillageSiege;
 import net.minecraft.world.IWorld;
-import net.minecraft.world.WorldType;
 import net.minecraft.world.biome.Biome;
 import net.minecraft.world.biome.provider.BiomeProvider;
 import net.minecraft.world.gen.NoiseChunkGenerator;
 import net.minecraft.world.gen.OctavesNoiseGenerator;
-import net.minecraft.world.gen.feature.Feature;
 import net.minecraft.world.server.ServerWorld;
-import net.minecraft.world.spawner.CatSpawner;
-import net.minecraft.world.spawner.PatrolSpawner;
-import net.minecraft.world.spawner.PhantomSpawner;
-import net.minecraft.world.spawner.WorldEntitySpawner;
 
 public class MoonChunkGenerator extends NoiseChunkGenerator<MoonGenerationSettings> {
     private static final float[] field_222576_h = Util.make(new float[25], (p_222575_0_) -> {
