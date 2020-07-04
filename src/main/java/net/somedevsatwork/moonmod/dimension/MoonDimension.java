@@ -46,9 +46,7 @@ public class MoonDimension extends Dimension {
 
     @Override
     public float calculateCelestialAngle(long worldTime, float partialTicks) {
-        double d0 = MathHelper.frac((double)worldTime / 24000.0D - 0.25D);
-        double d1 = 0.5D - Math.cos(d0 * Math.PI) / 2.0D;
-        return (float)(d0 * 2.0D + d1) / 3.0F;
+        return 0.5F;
     }
 
     @Override

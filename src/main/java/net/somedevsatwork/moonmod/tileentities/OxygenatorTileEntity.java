@@ -20,11 +20,11 @@ public class OxygenatorTileEntity extends TileEntity implements ITickableTileEnt
 
     @Override
     public void tick() {
-        // See if this is an airtight room
         if (!MoonMod.MoonHelper.isMoon(world)) {
             return;
         }
 
+        // See if this is an airtight room
         OxygenatedRegion region = enclosedSpaceAlgorithm.performCalculation(world, pos);
         if (region != null) {
             region.getOxygenStorage().accept(10);

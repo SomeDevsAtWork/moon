@@ -1,17 +1,22 @@
 package net.somedevsatwork.moonmod;
 
+import com.mojang.blaze3d.platform.GlStateManager;
 import net.minecraft.block.Block;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.command.CommandSource;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.entity.player.ServerPlayerEntity;
 import net.minecraft.item.*;
 import net.minecraft.tileentity.TileEntityType;
-import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.DamageSource;
+import net.minecraft.util.math.MathHelper;
 import net.minecraft.world.World;
 import net.minecraft.world.biome.Biome;
 import net.minecraft.world.dimension.DimensionType;
 import net.minecraft.world.server.ServerWorld;
+import net.minecraftforge.client.event.RenderGameOverlayEvent;
 import net.minecraftforge.common.BiomeManager;
 import net.minecraftforge.common.DimensionManager;
 import net.minecraftforge.common.MinecraftForge;
@@ -35,7 +40,6 @@ import net.somedevsatwork.moonmod.blocks.MoonRockBlock;
 import net.somedevsatwork.moonmod.blocks.OxygenatorBlock;
 import net.somedevsatwork.moonmod.capability.CapabilityOxygen;
 import net.somedevsatwork.moonmod.capability.IOxygenStorage;
-import net.somedevsatwork.moonmod.capability.OxygenStorage;
 import net.somedevsatwork.moonmod.capability.OxygenatedRegion;
 import net.somedevsatwork.moonmod.dimension.MoonBiome;
 import net.somedevsatwork.moonmod.dimension.MoonDimension;
@@ -49,7 +53,10 @@ import javax.annotation.Nullable;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
+
+import static net.minecraftforge.fml.client.gui.GuiUtils.drawTexturedModalRect;
 
 // The value here should match an entry in the META-INF/mods.toml file
 @Mod("moon")
@@ -57,7 +64,9 @@ public class MoonMod {
     // Directly reference a log4j logger.
     private static final Logger LOGGER = LogManager.getLogger();
 
-    private static final int OXYGEN_EXPENSE_TICK = 40;
+    private static final int OXYGEN_EXPENSE_TICK = 30;
+
+    private static final DamageSource OXYGEN_DAMAGE_SOURCE = (new DamageSource("oxygen")).setDamageBypassesArmor();
 
     public static final String MODID = "moon";
 
@@ -78,6 +87,8 @@ public class MoonMod {
     public static DimensionType moonDimensionType;
     public static MoonModDimension moonModDimension;
     public static MoonBiome moonBiome;
+
+    private static ConcurrentHashMap<UUID, MoonPlayer> moonPlayerInformation;
 
     /**
      * Map of all oxygenated regions
@@ -106,6 +117,7 @@ public class MoonMod {
         // Register ourselves for server and other game events we are interested in
         MinecraftForge.EVENT_BUS.register(this);
 
+        moonPlayerInformation = new ConcurrentHashMap<>();
         oxygenRegions = new ConcurrentHashMap<>();
     }
 
@@ -184,6 +196,8 @@ public class MoonMod {
                 return;
             }
 
+            boolean extractOxygenTick = MoonHelper.updatePlayerTick(event.player);
+
             boolean fullSuitOn = MoonHelper.hasFullSuitOn(event.player);
             OxygenatedRegion occupiedOxygenatedRegion = MoonHelper.inOxygenatedArea(event.player);
 
@@ -192,36 +206,42 @@ public class MoonMod {
                 IOxygenStorage regionOxygenStore = occupiedOxygenatedRegion.getOxygenStorage();
 
                 // Attempt to breathe from region
-                int breathedOxygen = regionOxygenStore.extract(1);
-                if (breathedOxygen == 0) {
-                    // Region became deoxygenated
-                    return;
+                if (extractOxygenTick) {
+                    int breathedOxygen = regionOxygenStore.extract(1);
+                    if (breathedOxygen == 0) {
+                        // Region became deoxygenated
+                        return;
+                    }
                 }
 
                 // Attempt to fill oxygenatable items in inventory
                 event.player.inventory.mainInventory
                         .stream()
                         .filter(MoonHelper::hasOxygenCapability)
-                        .map(stack -> stack.getCapability(CapabilityOxygen.OXYGEN).orElse(null))
+                        .map(stack -> stack.getCapability(CapabilityOxygen.OXYGEN).orElseThrow(IllegalAccessError::new))
                         .filter(storage -> !storage.isFull())
                         .forEach(storage -> {
                             int oxygen = regionOxygenStore.extract(1);
                             storage.accept(oxygen);
                         });
             } else {
-                if (fullSuitOn) {
-                    // Check if I have any items that have oxygen that can be consumed
-                    if (!MoonHelper.extractOxygen(event.player, 1)) {
-                        // Sufficate
-                        LOGGER.debug("Unoxygenated area + suit + couldn't consume");
+                if (extractOxygenTick) {
+                    if (fullSuitOn) {
+                        // Check if I have any items that have oxygen that can be consumed
+                        if (!MoonHelper.extractOxygen(event.player, 1)) {
+                            MoonHelper.suffocate(event.player);
+                        } else {
+                            // Reduce the durability of the space suit
+                            MoonHelper.damageSpaceSuit(event.player);
+                        }
                     } else {
-                        LOGGER.debug("Unoxygenated area + suit + consume");
+                        MoonHelper.suffocate(event.player);
                     }
-                } else {
-                    // Sufficate
-                    LOGGER.debug("Unoxygenated area + no suit");
                 }
             }
+
+
+
         }
 
         @SubscribeEvent
@@ -235,6 +255,49 @@ public class MoonMod {
         @SubscribeEvent
         public static void onAttachCapabilitiesEntity(AttachCapabilitiesEvent<Entity> event) {
             event.addCapability(CapabilityOxygen.PLAYER_RESOURCE, new CapabilityOxygen.Provider());
+        }
+
+        @SubscribeEvent
+        public static void onRenderEvent(RenderGameOverlayEvent.Post event) {
+            AtomicInteger totalOxygenLevel = new AtomicInteger();
+            AtomicInteger totalOxygenCapacity = new AtomicInteger();
+            if (Minecraft.getInstance().player == null) {
+                return;
+            }
+
+            Minecraft.getInstance().player.inventory.mainInventory
+                    .stream()
+                    .filter(MoonHelper::hasOxygenCapability)
+                    .map(stack -> stack.getCapability(CapabilityOxygen.OXYGEN).orElseThrow(IllegalAccessError::new))
+                    .forEach(storage -> {
+                        totalOxygenLevel.addAndGet(storage.getLevel());
+                        totalOxygenCapacity.addAndGet(storage.getCapacity());
+                    });
+
+            String s = "Oxygen: " + totalOxygenLevel + "/" + totalOxygenCapacity;
+            int xPos = 2;
+            int yPos = 2;
+
+            FontRenderer fontRenderer = Minecraft.getInstance().fontRenderer;
+            fontRenderer.drawString(s, xPos + 1, yPos, 0);
+            fontRenderer.drawString(s, xPos - 1, yPos, 0);
+            fontRenderer.drawString(s, xPos, yPos + 1, 0);
+            fontRenderer.drawString(s, xPos, yPos - 1, 0);
+            fontRenderer.drawString(s, xPos, yPos, MathHelper.rgb(0.67843137255f, 0.84705882353f, 0.90196078431f));
+
+            int regionCode = moonPlayerInformation.get(Minecraft.getInstance().player.getUniqueID()).getOxygenatedRegion();
+            if (regionCode != -1 && oxygenRegions.get(regionCode) != null) {
+                yPos += 12;
+
+                IOxygenStorage storage = oxygenRegions.get(regionCode).getOxygenStorage();
+                String x = "Room: " + storage.getLevel() + "/" + storage.getCapacity();
+
+                fontRenderer.drawString(x, xPos + 1, yPos, 0);
+                fontRenderer.drawString(x, xPos - 1, yPos, 0);
+                fontRenderer.drawString(x, xPos, yPos + 1, 0);
+                fontRenderer.drawString(x, xPos, yPos - 1, 0);
+                fontRenderer.drawString(x, xPos, yPos, MathHelper.rgb(0.67843137255f, 0.84705882353f, 0.90196078431f));
+            }
         }
     }
 
@@ -302,20 +365,56 @@ public class MoonMod {
             return hasFullSuitOn.get();
         }
 
+        /**
+         * TODO
+         * Reduce the durability of the space suit
+         * @param player the player wearing the space suit
+         */
+        public static void damageSpaceSuit(PlayerEntity player) {
+
+        }
+
         public static boolean hasOxygenCapability(ItemStack stack) {
             return stack.getCapability(CapabilityOxygen.OXYGEN).isPresent();
         }
 
         @Nullable
         public static OxygenatedRegion inOxygenatedArea(PlayerEntity player) {
-            for (OxygenatedRegion region : oxygenRegions.values()) {
-                if (region.positionInRegion(player.getPosition())) {
-                    LOGGER.debug("Player in region with oxygen level: {}", region.getOxygenStorage().getLevel());
-                    return region;
+            for (int regionCode : oxygenRegions.keySet()) {
+                if (oxygenRegions.get(regionCode).positionInRegion(player.getPosition())) {
+                    moonPlayerInformation.get(player.getUniqueID()).setOxygenatedRegion(regionCode);
+                    return oxygenRegions.get(regionCode);
                 }
             }
 
+            moonPlayerInformation.get(player.getUniqueID()).setOxygenatedRegion(-1);
             return null;
+        }
+
+        /**
+         *
+         * @param player the player to update tick
+         * @return Whether this tick was a tick where the player should try to extract oxygen
+         */
+        public static boolean updatePlayerTick(PlayerEntity player) {
+            boolean extractOxygenTick = false;
+            int tick = 0;
+            if (moonPlayerInformation.get(player.getUniqueID()) == null) {
+                moonPlayerInformation.put(player.getUniqueID(), new MoonPlayer());
+            } else {
+                tick = moonPlayerInformation.get(player.getUniqueID()).getTick() + 1;
+                if (tick == OXYGEN_EXPENSE_TICK) {
+                    extractOxygenTick = true;
+                    tick = 0;
+                }
+            }
+
+            moonPlayerInformation.get(player.getUniqueID()).setTick(tick);
+            return extractOxygenTick;
+        }
+
+        public static void suffocate(PlayerEntity player) {
+            player.attackEntityFrom(OXYGEN_DAMAGE_SOURCE, 0.5f);
         }
 
         /**
@@ -325,14 +424,14 @@ public class MoonMod {
          * @return whether the oxygen was fully extracted
          */
         public static boolean extractOxygen(PlayerEntity player, int amount) {
-            List<IOxygenStorage> storages = player.inventory.mainInventory
+            List<IOxygenStorage> storageList = player.inventory.mainInventory
                     .stream()
                     .filter(MoonHelper::hasOxygenCapability)
-                    .map(stack -> stack.getCapability(CapabilityOxygen.OXYGEN).orElse(null))
+                    .map(stack -> stack.getCapability(CapabilityOxygen.OXYGEN).orElseThrow(IllegalAccessError::new))
                     .collect(Collectors.toList());
 
             // Attempt to extract oxygen from 1 of the available sources
-            for (IOxygenStorage storage : storages) {
+            for (IOxygenStorage storage : storageList) {
                 int notExtracted = storage.extract(amount);
                 if (notExtracted != 0) {
                     return true;
