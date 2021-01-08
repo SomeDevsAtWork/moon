@@ -239,9 +239,6 @@ public class MoonMod {
                     }
                 }
             }
-
-
-
         }
 
         @SubscribeEvent
@@ -278,12 +275,7 @@ public class MoonMod {
             int xPos = 2;
             int yPos = 2;
 
-            FontRenderer fontRenderer = Minecraft.getInstance().fontRenderer;
-            fontRenderer.drawString(s, xPos + 1, yPos, 0);
-            fontRenderer.drawString(s, xPos - 1, yPos, 0);
-            fontRenderer.drawString(s, xPos, yPos + 1, 0);
-            fontRenderer.drawString(s, xPos, yPos - 1, 0);
-            fontRenderer.drawString(s, xPos, yPos, MathHelper.rgb(0.67843137255f, 0.84705882353f, 0.90196078431f));
+            drawStringHUD(s, xPos, yPos);
 
             int regionCode = moonPlayerInformation.get(Minecraft.getInstance().player.getUniqueID()).getOxygenatedRegion();
             if (regionCode != -1 && oxygenRegions.get(regionCode) != null) {
@@ -292,12 +284,23 @@ public class MoonMod {
                 IOxygenStorage storage = oxygenRegions.get(regionCode).getOxygenStorage();
                 String x = "Room: " + storage.getLevel() + "/" + storage.getCapacity();
 
-                fontRenderer.drawString(x, xPos + 1, yPos, 0);
-                fontRenderer.drawString(x, xPos - 1, yPos, 0);
-                fontRenderer.drawString(x, xPos, yPos + 1, 0);
-                fontRenderer.drawString(x, xPos, yPos - 1, 0);
-                fontRenderer.drawString(x, xPos, yPos, MathHelper.rgb(0.67843137255f, 0.84705882353f, 0.90196078431f));
+                drawStringHUD(x, xPos, yPos);
             }
+        }
+
+        /**
+         * Draws a string onto the local players screen
+         * @param text the text to draw
+         * @param x the x pos of the string
+         * @param y the y pos of the string
+         */
+        private static void drawStringHUD(String text, int x, int y) {
+            FontRenderer fontRenderer = Minecraft.getInstance().fontRenderer;
+            fontRenderer.drawString(text, x + 1, y, 0);
+            fontRenderer.drawString(text, x - 1, y, 0);
+            fontRenderer.drawString(text, x, y + 1, 0);
+            fontRenderer.drawString(text, x, y - 1, 0);
+            fontRenderer.drawString(text, x, y, MathHelper.rgb(0.67843137255f, 0.84705882353f, 0.90196078431f));
         }
     }
 
